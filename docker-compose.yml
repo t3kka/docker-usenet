@@ -1,0 +1,94 @@
+version: "3"
+
+networks:
+  usenet:
+    driver: bridge
+
+services:
+  vpn:
+    build:
+      context: .
+    container_name: vpn
+    restart: always
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - "/dev/net/tun"
+    networks:
+      - usenet
+    dns: 1.1.1.1
+  
+  radarr:
+    image: linuxserver/radarr:latest
+    container_name: radarr
+    restart: always
+    depends_on:
+      - vpn
+    expose:
+      - "7878"
+    network_mode: container:vpn
+    environment:
+      - PGID=${PGID}
+      - PUID=${PUID}
+    volumes:
+      - ${MOUNT_POINT}/radarr:/config
+      - ${MOUNT_POINT}/sabnzbd/downloads/:/downloads
+      - ${PLEX_ROOT}/movies/:/movies
+      - /etc/localtime:/etc/localtime:ro
+    labels:
+      - traefik.enable=true 
+      - traefik.backend=radarr 
+      - traefik.port=7878 
+      - traefik.front.rule=Host:radarr.${DOMAIN}
+      - traefik.docker.network=usenet 
+      - traefik.frontend.passHostHeader=true 
+
+  sonarr:
+    image: linuxserver/sonarr:latest
+    container_name: sonarr
+    restart: always
+    depends_on:
+      - vpn
+    expose:
+      - "8989"
+    network_mode: container:vpn
+    environment:
+      - PGID=${PGID}
+      - PUID=${PUID}
+    volumes:
+      - ${MOUNT_POINT}/sonarr/config:/config
+      - ${MOUNT_POINT}/sabnzbd/downloads/:/downloads
+      - ${PLEX_ROOT}/tvshows/:/tv
+      - /etc/localtime:/etc/localtime:ro
+    labels:
+      - traefik.enable=true 
+      - traefik.backend=sonarr 
+      - traefik.port=8989 
+      - traefik.front.rule=Host:sonarr.${DOMAIN} 
+      - traefik.docker.network=usenet 
+      - traefik.frontend.passHostHeader=true 
+
+  sabnzbd:
+    image: linuxserver/sabnzbd:latest
+    container_name: sab
+    restart: always
+    depends_on:
+      - vpn
+    expose:
+      - "8080"
+      - "9090"
+    network_mode: container:vpn
+    environment:
+      - PGID=${PGID}
+      - PUID=${PUID}
+    volumes:
+      - ${MOUNT_POINT}/sabnzbd/config:/config
+      - ${MOUNT_POINT}/sabnzbd/downloads/:/downloads
+      - /etc/localtime:/etc/localtime:ro
+    labels:
+      - traefik.enable=true 
+      - traefik.backend=sab 
+      - traefik.port=8080 
+      - traefik.front.rule=Host:sab.${DOMAIN} 
+      - traefik.docker.network=usenet 
+      - traefik.frontend.passHostHeader=true 

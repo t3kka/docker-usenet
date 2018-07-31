@@ -1,0 +1,6 @@
+# Set Variables for usenet stack
+DOMAIN=<domain>
+PGID=
+PGUI=
+MOUNT_POINT=
+PLEX_ROOT=
