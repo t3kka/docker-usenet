@@ -15,13 +15,31 @@ set -o nounset                              # Treat unset variables as an error
 dir="/PIA_CONFIG"
 file="$dir/.firewall"
 
+### pia_server: select the PIA endpoint to connect to
+# Arguments:
+#   vpn_gw) name of the VPN gateway which corresponds to an OPNVPN cert file.
+#           List obtained via https://www.privateinternetaccess.com/openvpn/openvpn.zip
+# Return: customized ovpn file
+vpn_gw() { 
+    local pia="$1"
+
+    sed -i '/^auth-user-pass/ s/$/ \/PIA_CONFIG\/.pia.cfg/' /PIA_CONFIG/CA\ Toronto.ovpn
+    sed -i '/^crl-verify/ s/ / \/PIA_CONFIG\//' /PIA_CONFIG/CA\ Toronto.ovpn
+    sed -i '/^ca/ s/ / \/PIA_CONFIG\//' /PIA_CONFIG/CA\ Toronto.ovpn
+
+    echo "script-security 2" >> /PIA_CONFIG/'"$pia"'
+    echo "up /PIA_CONFIG/update-resolv-conf.sh" >> /PIA_CONFIG/'"$pia"'
+    echo "down /PIA_CONFIG/update-resolv-conf.sh" >> /PIA_CONFIG/'"$pia"'
+
+    echo "OpenVPN config files updated"
+}
 
 ### firewall: firewall all output not DNS/VPN that's not over the VPN connection
 # Arguments:
 #   none)
 # Return: configured firewall
-firewall() { local network docker_network=$(ip -o addr show dev eth0 |
-                awk '$3 == "inet" {print $4}')
+firewall() { 
+    local network docker_network=$(ip -o addr show dev eth0 | awk '$3 == "inet" {print $4}')
 
     iptables -F OUTPUT
     iptables -P OUTPUT DROP
@@ -42,7 +60,8 @@ firewall() { local network docker_network=$(ip -o addr show dev eth0 |
 # Arguments:
 #   network) a CIDR specified network range
 # Return: configured return route
-return_route() { local gw network="$1"
+return_route() { 
+    local gw network="$1"
     gw=$(ip route | awk '/default/ {print $3}')
     ip route | grep -q "$network" ||
         ip route add to $network via $gw dev eth0
@@ -56,9 +75,11 @@ return_route() { local gw network="$1"
 # Arguments:
 #   none)
 # Return: Help text
-usage() { local RC=${1:-0}
+usage() { 
+    local RC=${1:-0}
     echo "Usage: ${0##*/} [-opt] [command]
-Options (fields in '[]' are optional, '<>' are required):
+    
+    Options (fields in '[]' are optional, '<>' are required):
     -h          This help
     -f          Firewall rules so that only the VPN and DNS are allowed to
                 send internet traffic (IE if VPN is down it's offline)
@@ -66,16 +87,16 @@ Options (fields in '[]' are optional, '<>' are required):
                 required arg: \"<network>\"
                 <network> add a route to (allows replies once the VPN is up)
 
-The 'command' (if provided and valid) will be run instead of openvpn
-" >&2
+    The 'command' (if provided and valid) will be run instead of openvpn" >&2
     exit $RC
 }
 
-while getopts ":hfr:" opt; do
+while getopts ":hfr:v:" opt; do
     case "$opt" in
         h) usage ;;
         f) firewall; touch $file ;;
         r) return_route "$OPTARG" ;;
+        v) vpn_gw "$OPTARG" ;;
        "?") echo "Unknown option: -$OPTARG"; usage 1 ;;
        ":") echo "No argument value for option: -$OPTARG"; usage 2 ;;
     esac

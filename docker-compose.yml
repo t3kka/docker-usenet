@@ -91,4 +91,16 @@ services:
       - traefik.port=8080 
       - traefik.front.rule=Host:sab.${DOMAIN} 
       - traefik.docker.network=usenet 
-      - traefik.frontend.passHostHeader=true 
+      - traefik.frontend.passHostHeader=true
+
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - usenet
+    volumes:
+      - ${MOUNT_POINT}/traefik/traefik.toml
